@@ -88,7 +88,7 @@
 </style>
 
 <div class="modal" style="@ModalStyle">
-    <div class="modal-content">
+    <div class="modal-content" style="padding: 18px;">
         <div class="modal-header">
             <p class="upload-memorandum">
                 <span class="upload">Cancel</span>
@@ -127,6 +127,7 @@
         StateHasChanged(); // Update the UI
     }
 
+    // after click yes update the request to canceled
     private async Task Confirm()
     {
         try
