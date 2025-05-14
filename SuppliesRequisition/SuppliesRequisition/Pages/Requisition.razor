@@ -185,13 +185,13 @@
     <div class="body-container">
         <div class="d-flex justify-content-between mt-3">
                     <p class="upload-memorandum">
-                        <span class="upload">Office and Store</span>
-                        <span class="memorandum">Supplies Requisition Form</span>
+                        <span class="upload">Supplies Requisition</span>
+                        <span class="memorandum">Form</span>
                     </p>
         </div>
 
         @if(!SuccessNotif){
-        <div class="column-two">
+            <div class="column-two">
                 <div>
                     <label class="input-label" for="SuserId">Requestor Name*</label>
                     <input type="text" id="SuserId" class="input-form" @bind="SuserId" disabled />
@@ -233,19 +233,19 @@
                     </select>
                 </div>
 
-        </div>
+            </div>
 
-        <div>
+            <div>
             <label>List of Items</label>
             <table class="table table-bordered">
                 <thead class="table-light">
                     <tr>
                         <th style="width:15%;">Item Code</th>
-                        <th style="width:46%;">Item Description</th>
-                        <th style="width:10%;">Quantity</th>
-                        <th style="width:10%;">UOM</th>
-                        <th style="width:20%;">Remarks</th>
-                        <th style="width:14%;">Action</th>
+                        <th style="width:45%;">Item Description</th>
+                        <th style="width:5%;">Quantity</th>
+                        <th style="width:8%;">UOM</th>
+                        <th style="width:20%;">Consumption</th>
+                        <th style="width:15%;">Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -253,7 +253,17 @@
                     {
                         <tr>
                             <td>@row.ItemCode</td>
-                            <td>@row.ItemDescription</td>
+                            <td>
+                                @row.ItemDescription
+                                @if (!string.IsNullOrEmpty(row.Size) && row.Size != "Unspecified")
+                                {
+                                    <text> (@row.Size)</text>
+                                }
+                                @if (!string.IsNullOrEmpty(row.ChildColor) && row.ChildColor != "Unspecified")
+                                {
+                                    <text> (@row.ChildColor)</text>
+                                }
+                            </td>
                             <td>@row.Quantity</td>
                             <td>@row.StockUom</td>
                             <td>@row.Remarks</td>
@@ -272,20 +282,26 @@
                             <input type="text" class="input-form" value="@selectedItem.ItemCode" readonly />
                         </td>
                         <td>
-                            <select class="select-input" value="@selectedItem.ItemName" @onchange="UpdateSelectedItem">
+                            <select class="select-input" @onchange="UpdateSelectedItem">
                                 @if (string.IsNullOrWhiteSpace(selectedItemDescription))
                                 {
                                     <option value="">-- Select Item --</option>
                                 }
                                 @if (Items != null && Items.Any())
                                 {
-                                    @foreach (var item in Items)
+                                    @foreach (var item in Items.Where(i => !rows.Any(r => r.ItemCode == i.ItemCode)).OrderBy(a => a.ItemName))
                                     {
-                                        string displaySize = (!item.ItemName.Contains($"({item.Size})") && item.Size != "Unspecified" && item.Size != null) ? $"({item.Size})" : "";
-                                        string displayColor = !string.IsNullOrWhiteSpace(item.ChildColor) ? $"({item.ChildColor})" : "";
-                                        string displayText = $"{item.ItemName} {displaySize} {displayColor}".Trim();
-
-                                        <option value="@item.ItemName">@displayText</option>
+                                        <option value="@item.ItemCode">
+                                            @item.ItemName 
+                                            @if (!string.IsNullOrEmpty(item.Size) && item.Size != "Unspecified")
+                                            {
+                                                <text> (@item.Size)</text>
+                                            }
+                                            @if (!string.IsNullOrEmpty(item.ChildColor) && item.ChildColor != "Unspecified")
+                                            {
+                                                <text> (@item.ChildColor)</text>
+                                            }
+                                        </option>
                                     }
                                 }
                             </select>
@@ -302,28 +318,27 @@
                         <td><input type="text" @bind="tempRemarks" class="input-form" /></td>
                         <td>
                             <button class="add-button" @onclick="AddNewRow" disabled="@(string.IsNullOrWhiteSpace(selectedItem.ItemName) || tempQuantity <= 0 || string.IsNullOrWhiteSpace(selectedItem.InvntryUom))">
-                                @* <svg xmlns="http://www.w3.org/2000/svg" class="ionicon" height="20" width="20" viewBox="0 0 512 512"><path d="M448 256c0-106-86-192-192-192S64 150 64 256s86 192 192 192 192-86 192-192z" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="32" /><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M256 176v160M336 256H176" /></svg> *@
+                                <svg xmlns="http://www.w3.org/2000/svg" class="ionicon" height="20" width="20" viewBox="0 0 512 512"><path d="M448 256c0-106-86-192-192-192S64 150 64 256s86 192 192 192 192-86 192-192z" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="32" /><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M256 176v160M336 256H176" /></svg>
                                 Add
                             </button>
                         </td>
                     </tr>
                 </tbody>
             </table>
-        </div>
+            </div>
 
-        <!-- Buttons -->
-        <div class="d-flex justify-content-center mt-3">
+            <!-- Buttons -->
+            <div class="d-flex justify-content-center mt-3">
             <!--<button class="btn btn-primary" @onclick="AddNewRow" disabled="@(rows.Any(row => row.UM == null || row.ItemDescription == null || row.Quantity <= 0))"> Add New Line </button>-->
             <button class="submit-button" @onclick="SubmitRequisition"
                     disabled="@(rows.Count == 0 || rows.Any(rows => rows.Quantity <= 0))">
                 Submit
             </button>
-        </div>
+            </div>
         } else {
-        <div class="loading-section">
-            <div class="spinner-grow" style="width: 3rem; height: 3rem; color: #00A3AD"></div>
-        </div>
-
+            <div class="loading-section">
+                <div class="spinner-grow" style="width: 3rem; height: 3rem; color: #00A3AD"></div>
+            </div>
         }
     </div>
 <!-- NEW -->
@@ -352,6 +367,7 @@
 
 
 <SubmitConfirmationModal @ref="ConfirmSubmit" OnConfirm="SubmitRequisitions"></SubmitConfirmationModal>
+<RequestNumberModal @ref="RequestModal" />
 
 
 @code {
@@ -365,20 +381,18 @@
     private List<AppUser>? users;
     private string? email { get; set; }
     private string? userEmail { get; set; }
-    private string? positions, Scompany, SuserId, Semail;
+    private string? positions, Scompany, SuserId, Semail, Sid;
     private bool isDataLoaded = false;
-
     private string? tempItemCode { get; set; }
     private string tempItemDescription { get; set; }
     private int tempQuantity { get; set; }
     private string tempUOM { get; set; }
     private string tempRemarks {get; set;}
-
     private SubmitConfirmationModal ConfirmSubmit;
-
+    private RequestNumberModal RequestModal;
+    private GeneratedHeaderId newHeaderId;
     private string selectedItemDescription = "";
     private Items selectedItem = new Items();
-
     private bool NoDepartmentNotif = false;
     private bool NoApproverNotif = false;
     private bool SuccessNotif = false;
@@ -386,12 +400,11 @@
     private void UpdateSelectedItem(ChangeEventArgs e)
     {
         selectedItemDescription = e.Value?.ToString() ?? "";
-        // Find the selected item from the list
-        var foundItem = Items.FirstOrDefault(i => i.ItemName == selectedItemDescription);
+        var foundItem = Items.FirstOrDefault(i => i.ItemCode == selectedItemDescription);
 
         if (foundItem != null)
         {
-            // Force Blazor to recognize changes
+            // Console.WriteLine($"ItemCode: {foundItem.ItemCode}");
             selectedItem = new Items
                 {
                     ItemCode = foundItem.ItemCode,
@@ -400,9 +413,12 @@
                     ChildColor = foundItem.ChildColor,
                     InvntryUom = foundItem.InvntryUom
                 };
-
-            StateHasChanged(); // Notify Blazor to refresh UI
         }
+        else
+        {
+            selectedItem = new Items(); // Reset if no item found
+        }
+        StateHasChanged();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -410,7 +426,7 @@
         if (firstRender)
         {
             // await LoadData();
-            isDataLoaded = true;
+            // isDataLoaded = true;
             // _sapService.Items = Items;
 
             var sessionId = await _Runtime.InvokeAsync<string>("sessionStorage.getItem", "session_id");
@@ -418,6 +434,7 @@
             Scompany = await _Runtime.InvokeAsync<string>("sessionStorage.getItem", "company");
             SuserId = await _Runtime.InvokeAsync<string>("sessionStorage.getItem", "username");
             Semail = await _Runtime.InvokeAsync<string>("sessionStorage.getItem", "email");
+            Sid = await _Runtime.InvokeAsync<string>("sessionStorage.getItem", "id");
             // Scompany = "EPC";
             // SuserId = "Jake Longares";
             // positions = "Admin";
@@ -436,7 +453,6 @@
                    databaseEPC: "Z_EPC_SBOTEST",
                 company: Scompany
             ); *@
-
 
             string approverSql = $"SELECT * FROM approvertable";
             approvers = (await _data.LoadData<Approvers, dynamic>(approverSql, new { headerId }, _config.GetConnectionString("DefaultConnection")));
@@ -466,44 +482,38 @@
             suppliesTable = "nbfisuppliesmaintenance";
         }
 
-        string allitemsql = $"SELECT ItemCode, ItemName, InvntryUom, U_ID007 as Size, U_ID011 as ChildColor FROM {suppliesTable} ORDER BY ItemName ASC";
+        // query for getting items from MySQL
+        string allitemsql = $"SELECT ItemCode, ItemName, InvntryUom, U_ID007 as Size, U_ID011 as ChildColor FROM {suppliesTable}";
 
         Items = await _data.LoadData<Items, dynamic>(allitemsql, new { }, _config.GetConnectionString("DefaultConnection"));
-
-
-        // Items = await Task.Run(() => _sapService.ExecuteQuery("SELECT \"ItemCode\", \"ItemName\", \"ItmsGrpCod\", \"U_ID007\", \"U_ID011\", \"PriceUnit\" FROM OITM WHERE \"U_Dim2\" = '99' ORDER BY \"ItemName\" ASC"));
-
-        // foreach(var item in Items){
-        //     Console.WriteLine($@"Item Code: {item.ItemNo}
-        //                         Item Name: {item.ItemDescription}
-        //                         Size: {item.Size}
-        //                         Color: {item.ChildColor}
-        //                         Uom: {item.StockUom}");
-        // }
     }
 
     private void AddNewRow()
     {
-
         var newRow = new TableRow
             {
                 ItemCode = selectedItem.ItemCode,
                 ItemDescription = selectedItem.ItemName,
                 Quantity = tempQuantity,
                 StockUom = selectedItem.InvntryUom,
-                Remarks = tempRemarks
+                Remarks = tempRemarks,
+                Size = selectedItem.Size,
+                ChildColor = selectedItem.ChildColor
             };
-        rows.Add(newRow);
+        if (!rows.Any(row => row.ItemCode == newRow.ItemCode))
+        {
+            rows.Add(newRow);
+            ResetInputs();
+        }
+    }
 
-        // Clear the input fields after adding
-        selectedItem.ItemCode = string.Empty;
-        selectedItem.ItemName = string.Empty;
+    private void ResetInputs()
+    {
+        selectedItem = new Items();
+        selectedItemDescription = "";
         tempQuantity = 0;
-        selectedItem.InvntryUom = string.Empty;
-        tempRemarks = string.Empty;
-
-
-        //=> rows.Add(new TableRow());
+        tempRemarks = "";
+        StateHasChanged();
     }
 
     private void RemoveRow(TableRow row) 
@@ -538,7 +548,7 @@
         try{
             Console.WriteLine($"Email of Approver: {email}");
             // Insert into RequisitionHeaders
-            string headerSql = @"INSERT INTO RequisitionHeaders (RequestedBy, email, DateOfRequest, company, branchName, Approver, Status)
+            string headerSql = @"INSERT INTO requisitionheaders (RequestedBy, email, DateOfRequest, company, branchName, Approver, Status)
                                 VALUES (@RequestedBy, @email, @DateOfRequest, @company, @branchName, @Approver, @Status);
                                 SELECT LAST_INSERT_ID();";
 
@@ -554,23 +564,35 @@
                 email = userEmail
             };
 
+            // getting headers with connection string
             var headerIds = await _data.LoadData<int, dynamic>(headerSql, headerData, _config.GetConnectionString("DefaultConnection"));
             headerId = headerIds.FirstOrDefault();
 
 
             // Insert into RequisitionDetails
-            string detailSql = @"INSERT INTO RequisitionDetails
-                            (HeaderId, ItemCode, ItemDescription, Quantity, UM, Consumption)
+            string detailSql = @"INSERT INTO requisitiondetails
+                            (HeaderId, ItemCode, ItemDescription, Quantity, UOM, Consumption)
                             VALUES
                             (@HeaderId, @ItemCode, @ItemDescription, @Quantity, @StockUom, @Remarks);";
 
             foreach (var row in rows)
             {
+                var tempSize = "";
+                var tempColor = "";
+                if (!string.IsNullOrEmpty(row.Size) && row.Size != "Unspecified"){
+                    tempSize = row.Size;
+                }
+                if (!string.IsNullOrEmpty(row.ChildColor) && row.ChildColor != "Unspecified")
+                {
+                    tempColor = row.ChildColor;
+                }
+                var Desc = row.ItemDescription + tempSize + tempColor;
+
                 var detailData = new
                 {
                     HeaderId = headerId,
                     row.ItemCode,
-                    row.ItemDescription,
+                    ItemDescription = Desc,
                     row.Quantity,
                     row.StockUom,
                     row.Remarks
@@ -579,17 +601,18 @@
                 await _data.SaveData(detailSql, detailData, _config.GetConnectionString("DefaultConnection"));
             }
 
-            await _Runtime.InvokeVoidAsync("alert", "Requisition submitted successfully!");
+            //await _Runtime.InvokeVoidAsync("alert", $"Requisition submitted successfully! {headerId}");
             rows.Clear(); // Clear the table after submission
+            RequestModal.OpenModal(headerId);
 
-            await SendEmailAsync();
+            await SendEmailAsync(); // call the function of sending email
+            await SelfEmail();
         }
         catch(Exception ex){
+            // error handling
             Console.WriteLine($"Error in saving: {ex.Message}");
-        }
-        
+        }   
     }
-
 
     private RenderFragment ModalBodyContent => builder =>
     {
@@ -598,20 +621,22 @@
         builder.CloseElement();
     };
 
+    // send email to Approver
     private async Task SendEmailAsync()
     {
-
         var emailBody = new StringBuilder();
-        emailBody.AppendLine($"<h3>Hi Ma'am/Sir {Approver}</h3>");
-        emailBody.AppendLine($"<p>Ms/Mr. {SuserId} request a supplies.</p>");
-        emailBody.AppendLine($"<p><strong>Date of Request:</strong> {DateTime.Now.ToString("MM/dd/yyyy")}</p>");
-        emailBody.AppendLine($"<h4><a href='http://192.168.0.7:8484/#/table-list/extended' target='_blank'>View Request Details</a></h4>");
+        emailBody.AppendLine($"<h3>Dear {Approver} </h3>");
+        emailBody.AppendLine($"<p>You have received a new Office Supplies <b>Request No. {headerId}</b>, submitted on {DateTime.Now.ToString("MMMM dd, yyyy")}. This request is now pending your approval.</p>");
+        emailBody.AppendLine($"<p>To review and take action on the request, please log in to your PRESTO account or click the link below:</p>");
+        emailBody.AppendLine($"<p> <a href='http://192.168.0.7:8484/#/supplies/storerequestlist' target='_blank'>View Request Details</a> </p>");
+        emailBody.AppendLine($"<br />");
+        emailBody.AppendLine($"<p>Best regards</p>");
+        emailBody.AppendLine($"<p>PRESTO</p>");
 
         var message = new MimeKit.MimeMessage();
-        message.From.Add(new MimeKit.MailboxAddress("Supplies Requisition", "mis@barbizonfashion.com"));
-        message.To.Add(new MimeKit.MailboxAddress($"{Approver}", "newbarbizon333@gmail.com"));
-        message.To.Add(new MimeKit.MailboxAddress($"{SuserId}", $"{email}"));
-        message.Subject = $"New Requisition (ID: {headerId})";
+        message.From.Add(new MimeKit.MailboxAddress("PRESTO", "mis@barbizonfashion.com"));
+        message.To.Add(new MimeKit.MailboxAddress($"{Approver}", email));
+        message.Subject = $" New Office Supplies Request Awaiting Your Approval";
         message.Body = new MimeKit.TextPart("html")
             {
                 Text = emailBody.ToString()
@@ -631,19 +656,20 @@
         }
     }
 
+    // email send to requestor
     private async Task SelfEmail()
     {
-
         var emailBody = new StringBuilder();
-        emailBody.AppendLine($"<h3>Hi Ma'am/Sir {Approver}</h3>");
-        emailBody.AppendLine($"<p>Ms/Mr. {SuserId} request a supplies.</p>");
-        emailBody.AppendLine($"<p><strong>Date of Request:</strong> {DateTime.Now.ToString("MM/dd/yyyy")}</p>");
-        emailBody.AppendLine($"<h4><a href='http://192.168.0.7:8484/#/table-list/extended' target='_blank'>View Request Details</a></h4>");
+        emailBody.AppendLine($"<p>Dear {SuserId} </p>");
+        emailBody.AppendLine($"<p>You have received a new office supplies request <b>{headerId}</b>. To view the details, click <a href='http://192.168.0.7:8484/#/supplies/storerequestlist' target='_blank'>View Request Details</a></p>");
+        emailBody.AppendLine($"<br />");
+        emailBody.AppendLine($"<p>Best regards</p>");
+        emailBody.AppendLine($"<p>PRESTO</p>");
 
         var message = new MimeKit.MimeMessage();
-        message.From.Add(new MimeKit.MailboxAddress("Supplies Requisition", "mis@barbizonfashion.com"));
-        message.To.Add(new MimeKit.MailboxAddress("Recipient Name", "newbarbizon333@gmail.com"));
-        message.Subject = $"New Requisition (ID: {headerId})";
+        message.From.Add(new MimeKit.MailboxAddress("PRESTO", "mis@barbizonfashion.com"));
+        message.To.Add(new MimeKit.MailboxAddress($"{SuserId}", Semail));
+        message.Subject = $"New Office Supplies Request!";
         message.Body = new MimeKit.TextPart("html")
             {
                 Text = emailBody.ToString()
@@ -663,6 +689,7 @@
         }
     }
 
+    // temporary table for adding new items
     public class TableRow
     {
         public string? ItemCode { get; set; }
@@ -671,13 +698,11 @@
         public string? StockUom { get; set; }
         public string? Consumption { get; set; }
         public string? Remarks { get; set; }
+        public string? ChildColor { get; set; }
+        public string? Size {get; set; }
     }
 
-    // private async Task LoadData()
-    // {
-    //     Items = await Task.Run(() => _sapService.ExecuteQuery("SELECT \"ItemCode\", \"ItemName\", \"ItmsGrpCod\", \"U_ID007\", \"U_ID011\" FROM OITM WHERE \"ItemCode\" LIKE '199%' OR \"ItemCode\" LIKE '299%' ORDER BY \"ItemName\" ASC"));
-    // }
-
+    // filter for approver list depends on department
     private void OnDepartmentChanged(ChangeEventArgs e)
     {
         Department = e.Value?.ToString();
