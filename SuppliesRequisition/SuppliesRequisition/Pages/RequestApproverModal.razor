@@ -1,5 +1,9 @@
 @using SuppliesRequisition.Model
-
+@using SuppliesRequisition.Data
+@inject SAPService _sapService
+@inject IJSRuntime _Runtime
+@inject IMyDataConnection _data
+@inject IConfiguration _config
 @using static SuppliesRequisition.Pages.RequestList
 <style>
     .modal {
@@ -29,26 +33,38 @@
         z-index: 1000;
     }
 
-    .close-button {
+    .closing-button {
         border: none;
         background-color: #fff;
         color: #000;
         border-radius: 2px;
     }
 
-        .close-button:hover{
+        .closing-button:hover{
             color: #fff;
             background-color: #AA0061;
         }
 
-    .modal-view-content {
+    .modal-dialog .modal-view-content {
         background-color: #fefefe;
         margin: 5% auto;
         border: 1px solid #888;
-        width: 60%;
+        width: 60% !important;
+        z-index: 100;
     }
-
-    .cancel-request-button {
+    .select-input {
+        display: block;
+        white-space: normal;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        width: 100%;
+        max-width: 100%; /* let it expand with its container */
+        height: auto;
+        line-height: 1.4em;
+        padding: 4px;
+        box-sizing: border-box;
+    }
+        .cancel-request-button {
         padding: 2px 16px;
         background-color: #fff;
         border: 1px solid #AA0061;
@@ -59,7 +75,10 @@
         .cancel-request-button:hover {
             background-color: #AA0061;
             color: white;
+            font-weight: normal;
+            text-decoration: none;
         }
+        
     p {
         margin-bottom: 0px !important;
     }
@@ -74,28 +93,130 @@
         grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 
-    .pending-status {
-        color: orange;
+    .canceled-status{
+        color: black
     }
 
-    .preparing-status {
-        color: blue;
+    .for-review-status {
+    color: orange;
+    }
+
+    .for-approval-status {
+    color: blue;
+    }
+
+    .prepare-status {
+        color: gray;
     }
 
     .completed-status {
-        color: #00A3AD;
+    color: green;
     }
 
     .denied-status {
-        color: #AA0061;
+    color: red;
     }
+
+    .status-bar{
+        width: 100%;
+        display: flex;
+    }
+
+    .status-tab {
+        color: black;
+        float: left;
+        border: none;
+        outline: none;
+        padding: 8px 0px;
+        width: 20%;
+        text-align: center;
+    }
+
+    .appro-status-tab {
+        color: black;
+        float: left;
+        border: none;
+        outline: none;
+        padding: 8px 0px;
+        width: 25%;
+        text-align: center;
+    }
+
+    .status-label {
+        font-size: 14px;
+    }
+
+
+
+.progress-status {
+    background-color: #00A3AD;
+    color: white;
+}
+.unprogress-status {
+    background-color: #7B7B7B;
+    color: white;
+}
+.onprogress-status {
+    background-color: orange;
+    color: white;
+}
+.status-tab {
+    color: black;
+    float: left;
+    border: none;
+    outline: none;
+    padding: 8px 0px;
+    width: 20%;
+    text-align: center;
+}
+.appro-status-tab {
+    color: black;
+    float: left;
+    border: none;
+    outline: none;
+    padding: 8px 0px;
+    width: 25%;
+    text-align: center;
+}
+.status-label {
+    font-size: 14px;
+}
+
+
+
+
+        .edit-action{
+            background-color: white;
+            border: 1px solid orange;
+            color: orange;
+            border-radius: 2px;
+            padding: 2.5px 10px;
+        }
+        .edit-action:hover {
+            background-color: orange;
+            color:white;
+        }
+        .add-item-button {
+            width: 100%; 
+            padding: 2px; 
+            border: 1px solid #00A3AD; 
+            cursor: pointer;" 
+            color: #00A3AD;
+            background-color: white;
+        }
+        .add-item-button:hover{
+            background-color: #00A3AD;
+            color: white;
+            text-decoration: none; 
+            font-weight: normal;
+        }
 </style>
 
-<div class="modal" style="@ModalStyle">
+<div class="modal" style="@ModalStyle" >
     <div class="modal-view-content">
         <div class="modal-header">
             <p class="upload-memorandum">
-                <span class="upload">Request</span>
+                <span class="upload">Requests</span>
                 <span class="memorandum">Details</span>
             </p>
             <button class="close-button" @onclick="Close">
@@ -107,11 +228,140 @@
         <div class="modal-body">
             @if (RequestItemDetails != null && RequestItemDetails.details != null)
             {
+                @if(RequestItemDetails.Status != "Denied" && RequestItemDetails.Status != "Canceled"){
+
+
+
+
+/* -------------------------- Orig By Jake -------------------------- */         
+/*                    <div class="status-bar">
+                        @if(RequestItemDetails.branchName != "Main")
+                        {
+                            @if (RequestItemDetails?.dateReview.HasValue == true)
+                            {
+                                <div id="ProgressStatus" class="@(RequestItemDetails.branchName != "Main" ? "status-tab" : "appro-status-tab")">
+                                    <p>REVIEWED</p>
+                                    <p class="status-label">@RequestItemDetails.dateReview.Value.ToString("MMMM dd, yyyy")</p>
+                                </div>
+                            } else {
+                                <div id="ONProgressStatus" class="@(RequestItemDetails.branchName != "Main" ? "status-tab" : "appro-status-tab")">
+                                    <p>FOR REVIEW</p>
+                                    <p class="status-label">-- --</p>
+                                </div>
+                            }
+                        }
+
+                        @if (RequestItemDetails?.DateApprove.HasValue == true)
+                        {
+                            <div id="ProgressStatus" class="@(RequestItemDetails.branchName != "Main" ? "status-tab" : "appro-status-tab")">
+                                <p>APPROVED</p>
+                                <p class="status-label">@RequestItemDetails.DateApprove.Value.ToString("MMMM dd, yyyy")</p>
+                            </div>
+                        } else {
+                             @if (RequestItemDetails?.dateReview.HasValue == true)
+                            {
+                                <div id="ONProgressStatus" class="@(RequestItemDetails.branchName != "Main" ? "status-tab" : "appro-status-tab")">
+                                    <p>FOR APPROVAL</p>
+                                    <p class="status-label">-- --</p>
+                                </div>
+                            } else {
+                                <div id="UNProgressStatus" class="@(RequestItemDetails.branchName != "Main" ? "status-tab" : "appro-status-tab")">
+                                    <p>FOR APPROVAL</p>
+                                    <p class="status-label">-- --</p>
+                                </div>
+                            }
+                        }
+                        
+                        @if (RequestItemDetails?.DatePicked.HasValue == true)
+                        {
+                            <div id="ProgressStatus" class="@(RequestItemDetails.branchName != "Main" ? "status-tab" : "appro-status-tab")">
+                                <p>PICKED</p>
+                                <p class="status-label">@RequestItemDetails.DatePicked.Value.ToString("MMMM dd, yyyy")</p>
+                            </div>
+                        } else {
+                            @if (RequestItemDetails?.DateApprove.HasValue == true)
+                            {
+                                <div id="ONProgressStatus" class="@(RequestItemDetails.branchName != "Main" ? "status-tab" : "appro-status-tab")">
+                                    <p>PICKING</p>
+                                    <p class="status-label">-- --</p>
+                                </div>
+                            } else {
+                                <div id="UNProgressStatus" class="@(RequestItemDetails.branchName != "Main" ? "status-tab" : "appro-status-tab")">
+                                    <p>PICKING</p>
+                                    <p class="status-label">-- --</p>
+                                </div>
+                                }
+                        }
+
+                        @if (RequestItemDetails?.DateCompleted.HasValue == true)
+                        {
+                            <div id="ProgressStatus" class="@(RequestItemDetails.branchName != "Main" ? "status-tab" : "appro-status-tab")">
+                                <p>PACKING</p>
+                                <p class="status-label">@RequestItemDetails.DateCompleted.Value.ToString("MMMM dd, yyyy")</p>
+                            </div>
+                            <div id="ProgressStatus" class="@(RequestItemDetails.branchName != "Main" ? "status-tab" : "appro-status-tab")">
+                                <p >COMPLETED</p>
+                                <p class="status-label">@RequestItemDetails.DateCompleted.Value.ToString("MMMM dd, yyyy")</p>
+                            </div>
+                        } else {
+                            <div id="UNProgressStatus" class="@(RequestItemDetails.branchName != "Main" ? "status-tab" : "appro-status-tab")">
+                                <p>PACKING</p>
+                                <p class="status-label">-- --</p>
+                            </div>
+                            <div id="UNProgressStatus" class="@(RequestItemDetails.branchName != "Main" ? "status-tab" : "appro-status-tab")">
+                                <p>INCOMPLETE</p>
+                                <p class="status-label">-- --</p>
+                            </div>
+                        }
+                    </div>
+*/                
+/* -------------------------- Orig By Jake -------------------------- */         
+
+
+
+
+/* -------------------------- JO -------------------------- */                    
+<div class="status-bar">
+    @if(RequestItemDetails.branchName != "Main")
+    {
+        <div class="@GetStatusClass("For Review") status-tab">
+            <p>@(RequestItemDetails.dateReview.HasValue ? "REVIEWED" : "FOR REVIEW")</p>
+            <p class="status-label">@(RequestItemDetails.dateReview.HasValue ? RequestItemDetails.dateReview.Value.ToString("MMMM dd, yyyy") : "-- --")</p>
+        </div>
+    }
+
+    <div class="@GetStatusClass("For Approval") @(RequestItemDetails.branchName != "Main" ? "status-tab" : "appro-status-tab")">
+        <p>@(RequestItemDetails.DateApprove.HasValue ? "APPROVED" : "FOR APPROVAL")</p>
+        <p class="status-label">@(RequestItemDetails.DateApprove.HasValue ? RequestItemDetails.DateApprove.Value.ToString("MMMM dd, yyyy") : "-- --")</p>
+    </div>
+
+    <div class="@GetStatusClass("Picking") @(RequestItemDetails.branchName != "Main" ? "status-tab" : "appro-status-tab")">
+        <p>@(RequestItemDetails.DatePicked.HasValue ? "PICKED" : "PICKING")</p>
+        <p class="status-label">@(RequestItemDetails.DatePicked.HasValue ? RequestItemDetails.DatePicked.Value.ToString("MMMM dd, yyyy") : "-- --")</p>
+    </div>
+
+    <div class="@GetStatusClass("Packing") @(RequestItemDetails.branchName != "Main" ? "status-tab" : "appro-status-tab")">
+        <p>PACKING</p>
+        <p class="status-label">@(RequestItemDetails.DateCompleted.HasValue ? RequestItemDetails.DateCompleted.Value.ToString("MMMM dd, yyyy") : "-- --")</p>
+    </div>
+
+    <div class="@GetStatusClass("Completed") @(RequestItemDetails.branchName != "Main" ? "status-tab" : "appro-status-tab")">
+        <p>@(RequestItemDetails.DateCompleted.HasValue ? "COMPLETED" : "INCOMPLETE")</p>
+        <p class="status-label">@(RequestItemDetails.DateCompleted.HasValue ? RequestItemDetails.DateCompleted.Value.ToString("MMMM dd, yyyy") : "-- --")</p>
+    </div>
+</div>
+            /* -------------------------- JO -------------------------- */
+                }
+            }
+
+            <div>
+            @if (RequestItemDetails != null && RequestItemDetails.details != null)
+            {
                 @* @RequestItemDetails.Position *@
                 <div style="padding: 20px;">
                     <div class="column-number-4">
                         <div>
-                            <label class="input-label">Requestor Number</label>
+                            <label class="input-label">Transaction Number</label>
                             <p>@RequestItemDetails.HeaderId</p>
                         </div>
                         <div>
@@ -123,83 +373,41 @@
                             <p>@RequestItemDetails.DateOfRequest.ToString("MMMM dd, yyyy")</p>
                         </div>
                         <div>
-                            <label class="input-label">Status</label>
-                            <p class ="@(RequestItemDetails.Status.ToLower())-status ">@RequestItemDetails.Status</p>
-                        </div>
-                    </div>
-                    <br />
-                    <div class="column-number-4">
-                        <div>
                             <label class="input-label">Branch</label>
                             <p>@RequestItemDetails.branchName</p>
                         </div>
-                        <div>
-                            <label class="input-label">Chain</label>
-                            <p>@RequestItemDetails.chain</p>
-                        </div>
-                        <div>
-                            <label class="input-label">Date Reviewed</label>
-                            @if (RequestItemDetails?.dateReview.HasValue == true)
-                            {
-                                <p>@RequestItemDetails.dateReview.Value.ToString("MMMM dd, yyyy")</p>
-                            }
-                            else
-                            {
-                                <p>-- --</p>
-                            }
-                        </div>
-                        <div>
-                            <label class="input-label">Reviewer</label>
-                            @if (RequestItemDetails?.Reviewer != null)
-                            {
-                                <p>@RequestItemDetails.Reviewer</p>
-                            }
-                            else
-                            {
-                                <p>-- --</p>
-                            }
-                        </div>
                     </div>
                     <br />
-                    <div class="column-number-4">
-                        <div>
-                            <label class="input-label">Date Approved</label>
-                            @if (RequestItemDetails?.DateApprove.HasValue == true)
-                            {
-                                <p>@RequestItemDetails.DateApprove.Value.ToString("MMMM dd, yyyy")</p>
+                        <div class="column-number-4">
+                            @if(RequestItemDetails.branchName != "Main"){
+                                    <div>
+                                        <label class="input-label">Reviewer</label>
+                                        <p>@RequestItemDetails.Reviewer</p>
+                                    </div>
                             }
-                            else
-                            {
-                                <p>-- --</p>
-                            }
-                        </div>
-                        <div>
-                            <label class="input-label">Approver</label>
-                            <p>@RequestItemDetails.Approver</p>
-                        </div>
-                        <div>
-                            <label class="input-label">Date Completed</label>
-                            @if (RequestItemDetails?.DateCompleted.HasValue == true)
-                            {
-                                <p>@RequestItemDetails.DateCompleted.Value.ToString("MMMM dd, yyyy")</p>
-                            }
-                            else
-                            {
-                                <p>-- --</p>
-                            }
-                        </div>
-                        <div>
-                            <label class="input-label">Processor</label>
-                            @if (RequestItemDetails?.Process != null || RequestItemDetails?.Process != "")
-                            {
+                            <div>
+                                <label class="input-label">Approver</label>
+                                <p>@RequestItemDetails.Approver</p>
+                            </div>
+                            <div>
+                                <label class="input-label">Picker</label>
                                 <p>@RequestItemDetails.Process</p>
-                            }
-                            else
-                            {
-                                <p>-- --</p>
-                            }
+                            </div>
+                            <div>
+                                <label class="input-label">Request Fulfiller</label>
+                                <p>@RequestItemDetails.Process</p>
+                            </div>
                         </div>
-                    </div>
+                        <br />
+
+                    @if(RequestItemDetails.Status == "Denied"){
+                        <div class="column-number-4">
+                            <div>
+                                <label class="input-label">Reason</label>
+                                <p>@RequestItemDetails.Reason</p>
+                            </div>
+                        </div>
+                    }
                     <br />
 
                     <div>
@@ -209,6 +417,9 @@
                                     <th style="width: 30%;">Item Description</th>
                                     <th style="width: 10%;">Quantity</th>
                                     <th style="width: 10%;">UOM</th>
+                                    @if (isEditing){
+                                    <th id="remove-action" style="width: 10%;">Action</th>
+                                    }
                                     @* <th style="width: 25%;">Remark</th> *@
                                     @if (RequestItemDetails.Status == "Completed")
                                     {
@@ -217,55 +428,131 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var item in RequestItemDetails.details)
+                            @foreach (var detail in CombinedDetails)
                             {
                                 <tr>
-                                    <td>@item.ItemDescription</td>
-                                    <td>@item.Quantity</td>
-                                    <td>@item.UOM</td>
-                                    @* <td>@item.Consumption</td> *@
-                                    @if (RequestItemDetails.Status == "Completed")
-                                    {
-                                        <td>@item.Notes</td>
+                                    <td>@detail.ItemDescription</td>
+                                    <td>@detail.Quantity</td>
+                                    <td>@detail.UOM</td>
+                                    @if (isEditing){
+                                    <td>
+                                        <button class="cancel-request-button" @onclick="() => RemoveRequestedItem(detail.ItemCode)">Remove</button>
+                                    </td>
                                     }
                                 </tr>
                             }
                         </tbody>
                     </table>
+                    <div class="@(showConfirmModal ? "modal fade show d-block" : "modal fade")" tabindex="-1" role="dialog" style="@(showConfirmModal ? "background-color: rgba(0,0,0,0.5);" : "")">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-view-content modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Confirm Save Changes</h5>
+                                    <button class="closing-button" @onclick="CancelModal">
+                                        <svg width="20px" height="20px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M20.7457 3.32851C20.3552 2.93798 19.722 2.93798 19.3315 3.32851L12.0371 10.6229L4.74275 3.32851C4.35223 2.93798 3.71906 2.93798 3.32854 3.32851C2.93801 3.71903 2.93801 4.3522 3.32854 4.74272L10.6229 12.0371L3.32856 19.3314C2.93803 19.722 2.93803 20.3551 3.32856 20.7457C3.71908 21.1362 4.35225 21.1362 4.74277 20.7457L12.0371 13.4513L19.3315 20.7457C19.722 21.1362 20.3552 21.1362 20.7457 20.7457C21.1362 20.3551 21.1362 19.722 20.7457 19.3315L13.4513 12.0371L20.7457 4.74272C21.1362 4.3522 21.1362 3.71903 20.7457 3.32851Z" fill="currentColor" />
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div class="modal-body" style="padding: 1rem 1rem;">
+                                    <p>Are you sure you want to save changes?</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn-secondary" style="border-radius: 2px; border: none; padding: 3.5px 8px;" @onclick="CancelModal">Cancel</button>
+                                    <button type="button" class="approve-button" @onclick="ConfirmSave">Confirm</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <br/>
+                    @if(isEditing){
+                    <div style=" overflow-x: auto;">
+                        <table class="table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 30%">Item Description</th>
+                                    <th style="width: 30%">Quantity</th>
+                                    <th style="width: 30%">UOM</th>
+                                    <th style="width: 10%">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="padding: 4px 6px; width: 25%; vertical-align: top;">
+                                        <select class="select-input" @onchange="UpdateSelectedItem">
+                                            @if (string.IsNullOrWhiteSpace(selectedItemDescription))
+                                            {
+                                                <option value="">-- Select Item --</option>
+                                            }
+                                            @if (Items != null && Items.Any())
+                                            {
+                                                @foreach (var item in Items.Where(i => !rows.Any(r => r.ItemCode == i.ItemCode)).OrderBy(a => a.ItemName))
+                                                {
+                                                    <option value="@item.ItemCode">
+                                                        @item.ItemName 
+                                                        @if (!string.IsNullOrEmpty(item.Size) && item.Size != "Unspecified")
+                                                        {
+                                                            <text> (@item.Size)</text>
+                                                        }
+                                                        @if (!string.IsNullOrEmpty(item.ChildColor) && item.ChildColor != "Unspecified")
+                                                        {
+                                                            <text> (@item.ChildColor)</text>
+                                                        }
+                                                    </option>
+                                                }
+                                            }
+                                        </select>
+                                    </td>
+
+                                    <td style="padding: 4px 6px; width: 15%; vertical-align: top;">
+                                        <input type="number" @bind="tempQuantity" class="input-form" 
+                                            style="width: 100%; padding: 2px; box-sizing: border-box;" 
+                                            oninput="if (this.value < 0) this.value = 0;" />
+                                    </td>
+
+                                    <td style="padding: 4px 6px; width: 15%; vertical-align: top;">
+                                        <input type="text" class="input-form" value="@selectedItem.InvntryUom" readonly 
+                                            style="width: 100%; padding: 2px; box-sizing: border-box;" />
+                                    </td>
+
+                                    <td style="padding: 4px 6px; width: 15%; vertical-align: top;">
+                                        <button class="add-item-button" @onclick="AddNewRow" 
+                                                disabled="@(string.IsNullOrWhiteSpace(selectedItem.ItemName) || tempQuantity <= 0 || string.IsNullOrWhiteSpace(selectedItem.InvntryUom))">
+                                            Add
+                                        </button>
+                                    </td>
+                                </tr>
+
+                            </tbody>
+
+                        </table>
+                    </div>
+                    }
                     </div>
                 </div>
             }
+            </div>
         </div>
+
         <div class="modal-footer">
-            
-            @if (RequestItemDetails != null && ((RequestItemDetails.Status == "Pending" && RequestItemDetails.Position == "Reviewer") || (RequestItemDetails.Status == "For Approval" && RequestItemDetails.Position == "Approver")))
+            <!-- Edit here -->
+            @if (RequestItemDetails != null && ((RequestItemDetails.Status == "For Review" && RequestItemDetails.Position == "Reviewer") || (RequestItemDetails.Status == "For Approval" && RequestItemDetails.Position == "Approver")))
             {
+                @if(!isEditing){
+                <button @onclick="() => ShowEdit()" class="edit-action">
+                    Edit
+                </button>
                 <button @onclick="() => ApproveRequest(RequestItemDetails)" class="approve-button">
-                    <svg fill="currentColor" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <defs>
-                            <style>
-                                .cls-1 {
-                                fill-rule: evenodd;
-                                }
-                            </style>
-                        </defs>
-                        <path id="cancel" class="cls-1" d="M936,120a12,12,0,1,1,12-12A12,12,0,0,1,936,120Zm0-22a10,10,0,1,0,10,10A10,10,0,0,0,936,98Zm4.706,14.706a0.951,0.951,0,0,1-1.345,0l-3.376-3.376-3.376,3.376a0.949,0.949,0,1,1-1.341-1.342l3.376-3.376-3.376-3.376a0.949,0.949,0,1,1,1.341-1.342l3.376,3.376,3.376-3.376a0.949,0.949,0,1,1,1.342,1.342l-3.376,3.376,3.376,3.376A0.95,0.95,0,0,1,940.706,112.706Z" transform="translate(-924 -96)" />
-                    </svg>
                     Approve
                 </button>
                 <button @onclick="() => DeniedRequest(RequestItemDetails)" class="cancel-request-button">
-                    <svg fill="currentColor" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                        <style>
-                            .cls-1 {
-                                fill-rule: evenodd;
-                            }
-                        </style>
-                    </defs>
-                    <path id="cancel" class="cls-1" d="M936,120a12,12,0,1,1,12-12A12,12,0,0,1,936,120Zm0-22a10,10,0,1,0,10,10A10,10,0,0,0,936,98Zm4.706,14.706a0.951,0.951,0,0,1-1.345,0l-3.376-3.376-3.376,3.376a0.949,0.949,0,1,1-1.341-1.342l3.376-3.376-3.376-3.376a0.949,0.949,0,1,1,1.341-1.342l3.376,3.376,3.376-3.376a0.949,0.949,0,1,1,1.342,1.342l-3.376,3.376,3.376,3.376A0.95,0.95,0,0,1,940.706,112.706Z" transform="translate(-924 -96)" />
-                </svg>
-                Denied
-            </button>
+                    Deny
+                </button>
+                }
+                else{
+                <button @onclick="ShowConfirmModal" class="approve-button">Save</button>
+                <button @onclick="HideEdit" style="border-radius: 2px; border: none; padding: 3.5px 8px;" class="btn-secondary">Cancel</button>
+                }
             }
         </div>
     </div>
@@ -275,10 +562,55 @@
 <ConfirmDeniedModal @ref="selectedDeniedRequest" RequestItemDetails="requestDetails" OnCancel="HandleCancel" />
 
 @code {
+    private string? positions, Scompany, SuserId, Semail, Sid;
+
+    private string selectedItemCode { get; set; } = ""; // Property for two-way binding
+    private Items selectedItem { get; set; } = new Items();
+    private string selectedItemDescription { get; set; } = "";
+
     [Parameter] public string RequestDetails { get; set; } // Ensure this is public
     [Parameter] public RequisitionHeader RequestItemDetails { get; set; } // Ensure this is public
-    [Parameter]
-    public RequisitionHeader Request { get; set; }
+    [Parameter] public RequisitionHeader Request { get; set; }
+
+
+    private int headerId;
+    private List<Approvers>? approvers;
+    private List<AppUser>? users;
+    private string? userEmail { get; set; }
+    private string? tempItemCode { get; set; }
+    private string tempItemDescription { get; set; }
+    private int tempQuantity { get; set; }
+    private string tempUOM { get; set; }
+    private string tempRemarks {get; set;}
+    private bool showConfirmModal = false;
+    private RequisitionHeader requestDetails;
+    private ConfirmApprovedModal selectedApprovedRequest;
+    private ConfirmDeniedModal selectedDeniedRequest;
+
+
+    private List<RequisitionDetail> CombinedDetails => 
+        RequestItemDetails.details
+            .Where(x => !ExcludedItemCodes.Contains(x.ItemCode))
+            .Concat(rows.Select(r => new RequisitionDetail
+            {
+                ItemCode = r.ItemCode ?? string.Empty,
+                ItemDescription = r.ItemDescription ?? string.Empty,
+                Quantity = r.Quantity,
+                UOM = r.StockUom ?? string.Empty,
+                Notes = r.Remarks ?? string.Empty,
+                Remarks = r.Remarks ?? string.Empty,
+                Consumption = r.Consumption ?? string.Empty,
+                SapStatus = string.Empty,
+                HeaderId = RequestItemDetails.HeaderId, // Use current HeaderId
+                DetailId = 0
+            }))
+            .ToList();
+
+
+    private List<Items>? Items;
+    private List<TableRow> rows { get; set; } = new List<TableRow>();
+
+    private List<string> ExcludedItemCodes { get; set; } = new List<string>();
 
     [Parameter] public EventCallback<bool> OnConfirm { get; set; }
     [Parameter] public EventCallback<bool> OnCancel { get; set; }
@@ -286,6 +618,58 @@
 
     private string ModalStyle => ShowModal ? "display: block;" : "display: none;";
     private bool ShowModal { get; set; }
+
+
+    private string GetStatusClass(string status)
+    {
+        // Define the sequence of statuses
+        var statusSequence = new List<string> { "For Review", "For Approval", "Picking", "Packing", "Completed" };
+
+        // If the request is Denied or Canceled, all tabs are unprogressed
+        if (RequestItemDetails.Status == "Denied" || RequestItemDetails.Status == "Canceled")
+        {
+            return "unprogress-status";
+        }
+
+        // Find the index of the current status and the target status
+        int currentStatusIndex = statusSequence.IndexOf(RequestItemDetails.Status);
+        int targetStatusIndex = statusSequence.IndexOf(status);
+
+        // If the target status is before or equal to the current status, it's completed or in progress
+        if (targetStatusIndex < currentStatusIndex)
+        {
+            return "progress-status";
+        }
+        else if (targetStatusIndex == currentStatusIndex)
+        {
+            return "onprogress-status";
+        }
+        else
+        {
+            return "unprogress-status";
+        }
+    }
+
+
+    private void ShowConfirmModal()
+    {
+        showConfirmModal = true;
+        StateHasChanged();
+    }
+
+    private void CancelModal()
+    {
+        showConfirmModal = false;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmSave()
+    {
+        showConfirmModal = false;
+        await SaveChanges();
+        StateHasChanged();
+    }
+
 
     public void OpenModal()
     {
@@ -310,17 +694,261 @@
         StateHasChanged(); // Update the UI
     }
 
-    private RequisitionHeader requestDetails;
-    private ConfirmApprovedModal selectedApprovedRequest;
-    private ConfirmDeniedModal selectedDeniedRequest;
 
-    private void ApproveRequest(RequisitionHeader RequestDetails)
+    private async Task SaveChanges()
     {
+        // 1. Delete excluded items from requisitiondetails
+        if (ExcludedItemCodes.Any())
+        {
+            string deleteSql = @"DELETE FROM requisitiondetails WHERE HeaderId = @HeaderId AND ItemCode IN @ItemCodes";
+            var parameters = new
+            {
+                HeaderId = RequestItemDetails.HeaderId,
+                ItemCodes = ExcludedItemCodes
+            };
+            await _data.SaveData(deleteSql, parameters, _config.GetConnectionString("DefaultConnection"));
+
+            // Update in-memory details
+            RequestItemDetails.details = RequestItemDetails.details
+                .Where(d => !ExcludedItemCodes.Contains(d.ItemCode))
+                .ToList();
+        }
+
+        // 2. Insert new rows into requisitiondetails
+        foreach (var row in rows)
+        {
+            var detailData = new
+            {
+                HeaderId = RequestItemDetails.HeaderId,
+                ItemCode = row.ItemCode ?? string.Empty,
+                ItemDescription = row.ItemDescription ?? string.Empty,
+                Quantity = row.Quantity,
+                StockUom = row.StockUom ?? string.Empty,
+                Remarks = row.Remarks ?? string.Empty
+            };
+
+            string detailSql = @"INSERT INTO requisitiondetails
+                                (HeaderId, ItemCode, ItemDescription, Quantity, UOM, Consumption)
+                                VALUES
+                                (@HeaderId, @ItemCode, @ItemDescription, @Quantity, @StockUom, @Remarks);";
+
+            await _data.SaveData(detailSql, detailData, _config.GetConnectionString("DefaultConnection"));
+
+            // Add to in-memory details
+            RequestItemDetails.details.Add(new RequisitionDetail
+            {
+                HeaderId = RequestItemDetails.HeaderId,
+                ItemCode = row.ItemCode ?? string.Empty,
+                ItemDescription = row.ItemDescription ?? string.Empty,
+                Quantity = row.Quantity,
+                UOM = row.StockUom ?? string.Empty,
+                Notes = row.Remarks ?? string.Empty,
+                Remarks = row.Remarks ?? string.Empty,
+                Consumption = row.Consumption ?? string.Empty,
+                SapStatus = string.Empty,
+                DetailId = 0 // Will be set by database
+            });
+        }
+
+        // 3. Reset state
+        ExcludedItemCodes.Clear();
+        rows.Clear();
+        ResetInputs();
+        isEditing = false;
+        StateHasChanged();
+    }
+
+    private void HideEdit()
+    {
+        // Cancel changes: reset state without saving to database
+        ExcludedItemCodes.Clear();
+        rows.Clear();
+        ResetInputs();
+        isEditing = false;
+        StateHasChanged();
+    }
+
+    private void RemoveRow(TableRow row) 
+    {
+        rows.Remove(row);
+        StateHasChanged(); // Ensure UI updates
+    }
+
+    private void RemoveRequestedItem(string? itemCode)
+    {
+        if (string.IsNullOrEmpty(itemCode)) return;
+
+        // Mark item as excluded for deletion
+        if (!ExcludedItemCodes.Contains(itemCode))
+        {
+            ExcludedItemCodes.Add(itemCode);
+        }
+
+        // Remove from rows if it exists there
+        var tempItem = rows.FirstOrDefault(x => x.ItemCode == itemCode);
+        if (tempItem != null)
+        {
+            rows.Remove(tempItem);
+        }
+
+        StateHasChanged();
+    }
+
+    // passing data to confirmation modal
+    private void ApproveRequest(RequisitionHeader RequestDetails)
+    {  
         requestDetails = RequestDetails;
         requestDetails.Position = RequestItemDetails.Position;
         requestDetails.User = RequestItemDetails.User;
         selectedApprovedRequest.OpenModal();
+        ExcludedItemCodes.Clear();
     }
+
+    private void UpdateSelectedItem(ChangeEventArgs e)
+    {
+        selectedItemCode = e.Value?.ToString() ?? "";
+        var foundItem = Items.FirstOrDefault(i => i.ItemCode == selectedItemCode); // Match ItemCode correctly
+
+        if (foundItem != null)
+        {
+            selectedItem = new Items
+            {
+                ItemCode = foundItem.ItemCode,
+                ItemName = foundItem.ItemName,
+                Size = foundItem.Size,
+                ChildColor = foundItem.ChildColor,
+                InvntryUom = foundItem.InvntryUom
+            };
+            selectedItemDescription = foundItem.ItemName;
+        }
+        else
+        {
+            selectedItem = new Items();
+            selectedItemDescription = "";
+            selectedItemCode = ""; // Ensure reset if no item is found
+        }
+
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // await LoadData();
+            // isDataLoaded = true;
+            // _sapService.Items = Items;
+
+            var sessionId = await _Runtime.InvokeAsync<string>("sessionStorage.getItem", "session_id");
+            positions = await _Runtime.InvokeAsync<string>("sessionStorage.getItem", "position");
+            Scompany = await _Runtime.InvokeAsync<string>("sessionStorage.getItem", "company");
+            SuserId = await _Runtime.InvokeAsync<string>("sessionStorage.getItem", "username");
+            Semail = await _Runtime.InvokeAsync<string>("sessionStorage.getItem", "email");
+            Sid = await _Runtime.InvokeAsync<string>("sessionStorage.getItem", "id");
+            // Scompany = "EPC";
+            // SuserId = "Jake Longares";
+            // positions = "Admin";
+            _sapService.SAPCompany = Scompany;
+
+            Console.WriteLine($"Company: {Scompany}");
+            Console.WriteLine($"Name: {SuserId}");
+            Console.WriteLine($"Name: {positions}");
+
+
+            string approverSql = $"SELECT * FROM approvertable";
+            approvers = (await _data.LoadData<Approvers, dynamic>(approverSql, new { headerId }, _config.GetConnectionString("DefaultConnection")));
+
+            string userSql = $"SELECT name, email FROM users WHERE name = '{SuserId}' AND position = '{positions}'";
+            users = await _data.LoadData<AppUser, dynamic>(userSql, new { }, _config.GetConnectionString("DefaultConnection"));
+
+            foreach(var us in users){
+                userEmail = us.Email;
+                Console.WriteLine($"User Email: {userEmail}");
+            }
+
+            await GetItem();
+            StateHasChanged(); // Force a re-render after data is loaded
+        }
+    }
+
+    private async Task GetItem()
+    {
+        string suppliesTable;
+        if (Scompany == "EPC" || Scompany == "AHLC")
+        {
+            suppliesTable = "epcsuppliesmaintenance";
+        }
+        else
+        {
+            suppliesTable = "nbfisuppliesmaintenance";
+        }
+
+        // query for getting items from MySQL
+        string allitemsql = $"SELECT ItemCode, ItemName, InvntryUom, U_ID007 as Size, U_ID011 as ChildColor FROM {suppliesTable}";
+
+        Items = await _data.LoadData<Items, dynamic>(allitemsql, new { }, _config.GetConnectionString("DefaultConnection"));
+    }
+
+
+    // temporary table for adding new items
+    public class TableRow
+    {
+        public string? ItemCode { get; set; }
+        public string? ItemDescription { get; set; }
+        public int Quantity { get; set; } = 0;
+        public string? StockUom { get; set; }
+        public string? Consumption { get; set; }
+        public string? Remarks { get; set; }
+        public string? ChildColor { get; set; }
+        public string? Size {get; set; }
+    }
+
+
+    private void AddNewRow()
+    {
+        var newRow = new TableRow
+        {
+            ItemCode = selectedItem.ItemCode,
+            ItemDescription = selectedItem.ItemName,
+            Quantity = tempQuantity,
+            StockUom = selectedItem.InvntryUom,
+            Remarks = tempRemarks,
+            Size = selectedItem.Size,
+            ChildColor = selectedItem.ChildColor
+        };
+        if (!rows.Any(row => row.ItemCode == newRow.ItemCode))
+        {
+            rows.Add(newRow);
+            ResetInputs();
+        }
+    }
+        
+    private void ResetInputs()
+    {
+        selectedItemCode = "";
+        selectedItem = new Items();
+        selectedItemDescription = "";
+        tempQuantity = 0;
+        tempRemarks = "";
+        StateHasChanged();
+    }
+
+
+
+///////////////////////////////////////////////////////////////////
+
+    private bool isEditing = false;
+
+
+
+    private void ShowEdit()
+    {
+        isEditing = true;
+
+    }
+
+
+
 
     private void DeniedRequest(RequisitionHeader RequestDetails)
     {
