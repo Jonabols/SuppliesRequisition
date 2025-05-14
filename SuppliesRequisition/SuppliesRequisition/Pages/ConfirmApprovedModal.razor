@@ -88,6 +88,7 @@
     p {
         margin-bottom: 0px !important;
     }
+    
 </style>
 
 <div class="modal" style="@ModalStyle">
@@ -98,7 +99,7 @@
                 <span class="memorandum">Request</span>
             </p>
         </div>
-        <div class="modal-body">
+        <div class="modal-body" style="padding: 18px;">
             @if (RequestItemDetails != null && RequestItemDetails.details != null)
             {
                 <p>Are you sure you want to APPROVE <b>Request Number @RequestItemDetails.HeaderId</b> ?</p>
@@ -120,7 +121,6 @@
     [Parameter] public EventCallback<bool> OnConfirm { get; set; }
     [Parameter] public EventCallback<bool> OnCancel { get; set; }
 
-
     private string ModalStyle => ShowModal ? "display: block;" : "display: none;";
     private bool ShowModal { get; set; }
 
@@ -135,7 +135,7 @@
         OnCancel.InvokeAsync(false);
     }
 
-    //Added 2/3/2025
+    //Added 2/3/2025 after click yes update the request
     private async Task Confirm()
     {
         try
@@ -143,13 +143,11 @@
             string updateHeaderQuery = "";
             if (RequestItemDetails != null && RequestItemDetails.HeaderId > 0) // Ensure ID is valid
             {
-                @* RequestItemDetails.Status = "Preparing"; *@
-
                 string connectionString = _config.GetConnectionString("DefaultConnection");
 
                 if (RequestItemDetails.Position == "Approver")
                 {
-                    RequestItemDetails.Status = "Preparing";
+                    RequestItemDetails.Status = "Picking";
                     updateHeaderQuery = @"UPDATE requisitionheaders
                                             SET Status = @Status, DateApprove = @DateApproved, Approver = @User
                                             WHERE HeaderId = @Id";
@@ -174,8 +172,12 @@
 
                 // Reload the page
                 _navigation.NavigateTo(_navigation.Uri, forceLoad: true);
-
-                @* await SendEmailAsync(); *@
+                
+                if(RequestItemDetails.Position == "Reviewer" && RequestItemDetails.branchName != "Main"){
+                    await SendEmailReviewed();
+                }else{
+                    await SendEmailApproved();
+                }
             }
         }
         catch (Exception ex)
@@ -195,21 +197,26 @@
         StateHasChanged(); // Update the UI
     }
 
-    //Added 2/3/2025
-    private async Task SendEmailAsync()
+    //Added 2/3/2025 sending email to Approver
+    private async Task SendEmailApproved()
     {
+        Console.WriteLine($"Email: {RequestItemDetails.Email}");
+
         var emailBody = new StringBuilder();
-        emailBody.AppendLine($"<h3>Hi Ms./Mr. {RequestItemDetails.RequestedBy}</h3>");
-        emailBody.AppendLine($"<p>Your request has been Approved. Please wait another email for the releasing of your request. Thank you!</p>");
-        emailBody.AppendLine($"<p><strong>Date of Request:</strong> {DateTime.Now.ToString("MM/dd/yyyy")}</p>");
-        emailBody.AppendLine($"<h4><a href='http://192.168.0.7:8484/#/supplies/requestlist' target='_blank'>View Request Details</a></h4>");
-        emailBody.AppendLine($"<p><i>This email is auto generated, please don't reply to this email.</i></p>");
+        emailBody.AppendLine($"<p>Dear {RequestItemDetails.RequestedBy}<p>");
+        emailBody.AppendLine($"<p>We would like to inform you that your supplies request with <b> Request No. {RequestItemDetails.HeaderId}</b>, submitted on {RequestItemDetails.DateOfRequest.ToString("MMMM dd, yyyy")}, has been approved.</p>");
+        emailBody.AppendLine($"<p> To check the status of your request, please log in to your PRESTO account. </p>");
+        emailBody.AppendLine($"<p>Your supplies are now being processed by the Logistics team. You will receive a notification when your supplies are ready for pickup or shipment.</p>");
+        emailBody.AppendLine($"<p>If you have any questions, please email or contact your Retail Area Supervisor/Retail Area Officer.</p>");
+        emailBody.AppendLine($"<br />");
+        emailBody.AppendLine($"<p>Best regards,</p>");
+        emailBody.AppendLine($"<p>PRESTO</p>");
 
         var message = new MimeKit.MimeMessage();
-        message.From.Add(new MimeKit.MailboxAddress("Supplies Requisition", "mis@barbizonfashion.com"));
-        message.To.Add(new MimeKit.MailboxAddress($"{RequestItemDetails.RequestedBy}", "newbarbizon333@gmail.com"));
+        message.From.Add(new MimeKit.MailboxAddress("BE Helpdesk and Supplies Requisition", "mis@barbizonfashion.com"));
+        message.To.Add(new MimeKit.MailboxAddress($"{RequestItemDetails.RequestedBy}", $"{RequestItemDetails.Email}"));
         message.To.Add(new MimeKit.MailboxAddress("Operation", "newbarbizon360@gmail.com"));
-        message.Subject = $"New Requisition (ID: {RequestItemDetails.HeaderId})";
+        message.Subject = $"Your Supplies Request Number {RequestItemDetails.HeaderId} Has Been Approved!";
         message.Body = new MimeKit.TextPart("html")
             {
                 Text = emailBody.ToString()
@@ -229,5 +236,38 @@
         }
     }
 
+    // sending email to Reviewer
+    private async Task SendEmailReviewed()
+    {
+        var emailBody = new StringBuilder();
+        emailBody.AppendLine($"<p>Dear {RequestItemDetails.RequestedBy}<p>");
+        emailBody.AppendLine($"<p>We would like to inform you that your supplies request with <b> Request No. {RequestItemDetails.HeaderId}</b>, submitted on {RequestItemDetails.DateOfRequest.ToString("MMMM dd, yyyy")}, has been reviewed and is now awaiting approval.</p>");
+        emailBody.AppendLine($"<p> To check the status of your request, please log in to your PRESTO account. </p>");
+        emailBody.AppendLine($"<p>If you have any questions, please email or contact your Retail Area Supervisor/Retail Area Officer.</p>");
+        emailBody.AppendLine($"<br />");
+        emailBody.AppendLine($"<p>Best regards,</p>");
+        emailBody.AppendLine($"<p>PRESTO</p>");
 
+        var message = new MimeKit.MimeMessage();
+        message.From.Add(new MimeKit.MailboxAddress("BE Helpdesk and Supplies Requisition", "mis@barbizonfashion.com"));
+        message.To.Add(new MimeKit.MailboxAddress($"{RequestItemDetails.RequestedBy}", $"{RequestItemDetails.Email}"));
+        message.Subject = $"Your Supplies Request Number {RequestItemDetails.HeaderId} Has Been Reviewed!";
+        message.Body = new MimeKit.TextPart("html")
+            {
+                Text = emailBody.ToString()
+            };
+
+        using var client = new MailKit.Net.Smtp.SmtpClient();
+        try
+        {
+            await client.ConnectAsync("smtp-relay.brevo.com", 587, MailKit.Security.SecureSocketOptions.StartTls);
+            await client.AuthenticateAsync("mis@barbizonfashion.com", "TwJrNP0BM9zvVHkt");
+            await client.SendAsync(message);
+            await client.DisconnectAsync(true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Email Sending Failed: {ex.Message}");
+        }
+    }
 }
